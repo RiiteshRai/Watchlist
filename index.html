@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>My Watchlist & Projects</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="container">
+<h1>MY WATCHLIST & PROJECTS</h1>
+<p class="subtitle">Home picks across everything • Section pages pick within that section</p>
+
+<!-- Level 1 Picker: At Home, picks a random section + random uncompleted item -->
+<div class="picker-box">
+<button class="pick-btn" id="home-pick-btn">🎲 Not sure what to do? Surprise me (Pick from ANY section)</button>
+<div class="pick-result" id="home-pick-result">
+<span class="pick-badge" id="home-pick-badge">CATEGORY</span>
+<div class="pick-title" id="home-pick-title"></div>
+<p class="pick-note" id="home-pick-note"></p>
+</div>
+</div>
+
+<a class="week movie" href="sections/movie.html">
+    <div>
+        <span>🎬 Movies</span><br>
+        <small>Films & cinema to watch</small>
+    </div>
+    <small>Open & Pick →</small>
+</a>
+
+<a class="week series" href="sections/series.html">
+    <div>
+        <span>📺 Series</span><br>
+        <small>TV shows & web series</small>
+    </div>
+    <small>Open & Pick →</small>
+</a>
+
+<a class="week anime" href="sections/anime.html">
+    <div>
+        <span>⚔️ Anime</span><br>
+        <small>Anime series & films</small>
+    </div>
+    <small>Open & Pick →</small>
+</a>
+
+<a class="week book" href="sections/book.html">
+    <div>
+        <span>📚 Books</span><br>
+        <small>Books, novels & manga</small>
+    </div>
+    <small>Open & Pick →</small>
+</a>
+
+<a class="week project" href="sections/project.html">
+    <div>
+        <span>💻 Projects</span><br>
+        <small>Side projects & coding ideas</small>
+    </div>
+    <small>Open & Pick →</small>
+</a>
+
+</div>
+
+<script>
+const SECTIONS = ["movie", "series", "anime", "book", "project"];
+
+async function fetchSectionActiveItems(sec) {
+    // 1. Check if mobile localStorage has updated HTML for this section
+    try {
+        const saved = localStorage.getItem("watchlist_sec_" + sec);
+        if (saved) {
+            const parsed = JSON.parse(saved);
+            if (parsed.html) {
+                return extractActiveFromHtml(sec, parsed.html);
+            }
+        }
+    } catch (e) {}
+
+    // 2. Otherwise fetch the static HTML file from sections/<sec>.html
+    try {
+        const resp = await fetch("sections/" + sec + ".html");
+        if (!resp.ok) return [];
+        const text = await resp.text();
+        return extractActiveFromHtml(sec, text);
+    } catch (e) {
+        return [];
+    }
+}
+
+function extractActiveFromHtml(sec, htmlString) {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(htmlString, "text/html");
+    const cards = Array.from(doc.querySelectorAll(".question"));
+    const active = [];
+    cards.forEach(c => {
+        const cb = c.querySelector("input[type='checkbox']");
+        const isDone = (cb && cb.hasAttribute("checked")) || c.classList.contains("solved") || c.getAttribute("data-status") === "done";
+        if (!isDone) {
+            const titleEl = c.querySelector(".item-title");
+            const tagEl = c.querySelector(".tag");
+            const noteEl = c.querySelector("p");
+            if (titleEl) {
+                active.push({
+                    section: sec.toUpperCase(),
+                    title: titleEl.textContent.trim(),
+                    tag: tagEl ? tagEl.textContent.trim() : "",
+                    note: noteEl ? noteEl.textContent.trim() : ""
+                });
+            }
+        }
+    });
+    return active;
+}
+
+document.getElementById("home-pick-btn").addEventListener("click", async () => {
+    const bySection = {};
+    for (const sec of SECTIONS) {
+        const items = await fetchSectionActiveItems(sec);
+        if (items.length > 0) {
+            bySection[sec] = items;
+        }
+    }
+
+    const availableSecs = Object.keys(bySection);
+    const resBox = document.getElementById("home-pick-result");
+    const badge = document.getElementById("home-pick-badge");
+    const title = document.getElementById("home-pick-title");
+    const note = document.getElementById("home-pick-note");
+
+    if (availableSecs.length === 0) {
+        resBox.classList.add("active");
+        badge.textContent = "ALL DONE";
+        title.textContent = "No active items found!";
+        note.textContent = "Open a section or run `python add.py` to add new items.";
+        return;
+    }
+
+    // Level 1: First pick a random category, then pick a random item inside it
+    const randomSec = availableSecs[Math.floor(Math.random() * availableSecs.length)];
+    const pool = bySection[randomSec];
+    const chosen = pool[Math.floor(Math.random() * pool.length)];
+
+    resBox.classList.add("active");
+    badge.textContent = "🎲 RANDOM CATEGORY: " + chosen.section;
+    title.textContent = chosen.title + (chosen.tag ? " [" + chosen.tag + "]" : "");
+    note.textContent = chosen.note;
+});
+</script>
+</body>
+</html>

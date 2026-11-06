@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Projects - Watchlist</title>
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<div class="container">
+<a class="back" href="../index.html">← Back to Home (All Sections)</a>
+
+<div class="week-header">
+<h1>Projects</h1>
+<div class="stats"><span id="solved">0</span> / <span id="total">0</span> done (<span id="active-count">0</span> active left)
+<div class="progress"><div class="progress-bar" id="progress-bar"></div></div>
+</div>
+</div>
+
+<!-- Level 2 Picker: Picks ONLY from this section's uncompleted items -->
+<div class="picker-box">
+<button class="pick-btn" id="section-pick-btn">🎲 Pick a Random Project</button>
+<div class="pick-result" id="pick-result">
+<span class="pick-badge">Selected from Projects</span>
+<div class="pick-title" id="pick-title"></div>
+<p class="pick-note" id="pick-note"></p>
+</div>
+</div>
+
+<!-- Mobile / Quick Add directly on page -->
+<div class="add-bar">
+<input type="text" id="new-title" placeholder="Add new project title...">
+<input type="text" id="new-tag" placeholder="Tag (optional)" style="max-width: 140px;">
+<button id="add-btn">Add</button>
+</div>
+
+<div class="toolbar">
+<button class="tool-btn" id="toggle-done-btn">Hide Done</button>
+<button class="tool-btn" id="print-btn">Print / View Clean List</button>
+</div>
+
+<div id="items-list">
+<!-- Problems/Items are added automatically by add.py or mobile quick-add -->
+<div class="question" data-status="todo">
+<div class="question-header">
+<div class="question-left">
+<input type="checkbox">
+<span class="item-title">Watchlist Random Picker</span> <span class="tag">Python + Web</span>
+</div>
+</div>
+<p>CF-style tracker with 2-level randomizer</p>
+<span class="status">TO WATCH / READ</span>
+</div>
+
+<div class="question" data-status="todo">
+<div class="question-header">
+<div class="question-left">
+<input type="checkbox">
+<span class="item-title">CLI Expense Logger</span> <span class="tag">Shell Script</span>
+</div>
+</div>
+<p>Quick terminal budget tool</p>
+<span class="status">TO WATCH / READ</span>
+</div>
+
+<!-- ITEMS_END -->
+</div>
+
+</div>
+
+<script>
+const STORAGE_KEY = "watchlist_sec_project";
+const listEl = document.getElementById("items-list");
+let hideDone = false;
+
+// Load extra mobile-added items & state overrides from localStorage
+function loadState() {
+    try {
+        const saved = localStorage.getItem(STORAGE_KEY);
+        if (saved) {
+            const data = JSON.parse(saved);
+            if (data.html) listEl.innerHTML = data.html;
+        }
+    } catch (e) {}
+    bindEvents();
+    updateStats();
+}
+
+function saveState() {
+    try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify({ html: listEl.innerHTML }));
+    } catch (e) {}
+}
+
+function updateStats() {
+    const all = listEl.querySelectorAll(".question");
+    const done = listEl.querySelectorAll(".question input:checked");
+    const total = all.length;
+    const solvedCount = done.length;
+    const activeCount = total - solvedCount;
+    document.getElementById("total").textContent = total;
+    document.getElementById("solved").textContent = solvedCount;
+    document.getElementById("active-count").textContent = activeCount;
+    document.getElementById("progress-bar").style.width = (total ? (solvedCount / total * 100) : 0) + "%";
+
+    all.forEach(card => {
+        const cb = card.querySelector("input[type='checkbox']");
+        if (hideDone && cb && cb.checked) {
+            card.style.display = "none";
+        } else {
+            card.style.display = "";
+        }
+    });
+}
+
+function bindEvents() {
+    listEl.querySelectorAll(".question").forEach(card => {
+        const cb = card.querySelector("input[type='checkbox']");
+        const statusEl = card.querySelector(".status");
+        if (!card.querySelector(".del-btn")) {
+            const header = card.querySelector(".question-header");
+            if (header) {
+                const del = document.createElement("button");
+                del.className = "del-btn";
+                del.title = "Delete from list";
+                del.textContent = "✕";
+                del.onclick = () => {
+                    card.remove();
+                    saveState();
+                    updateStats();
+                };
+                header.appendChild(del);
+            }
+        }
+        if (cb) {
+            if (cb.checked) {
+                card.classList.add("solved");
+                card.setAttribute("data-status", "done");
+            }
+            cb.onchange = () => {
+                if (cb.checked) {
+                    card.setAttribute("checked", "checked");
+                    cb.setAttribute("checked", "");
+                    card.classList.add("solved");
+                    card.setAttribute("data-status", "done");
+                    if (statusEl) statusEl.textContent = "DONE";
+                } else {
+                    cb.removeAttribute("checked");
+                    card.classList.remove("solved");
+                    card.setAttribute("data-status", "todo");
+                    if (statusEl) statusEl.textContent = "TO WATCH / READ";
+                }
+                saveState();
+                updateStats();
+            };
+        }
+    });
+}
+
+document.getElementById("add-btn").addEventListener("click", () => {
+    const titleInput = document.getElementById("new-title");
+    const tagInput = document.getElementById("new-tag");
+    const title = titleInput.value.trim();
+    const tag = tagInput.value.trim();
+    if (!title) return;
+
+    const div = document.createElement("div");
+    div.className = "question";
+    div.setAttribute("data-status", "todo");
+    div.innerHTML = `
+        <div class="question-header">
+            <div class="question-left">
+                <input type="checkbox">
+                <span class="item-title"></span>
+                ${tag ? '<span class="tag"></span>' : ''}
+            </div>
+        </div>
+        <p>Added from mobile / browser</p>
+        <span class="status">TO WATCH / READ</span>
+    `;
+    div.querySelector(".item-title").textContent = title;
+    if (tag) div.querySelector(".tag").textContent = tag;
+
+    listEl.appendChild(div);
+    titleInput.value = "";
+    tagInput.value = "";
+    bindEvents();
+    saveState();
+    updateStats();
+});
+
+document.getElementById("section-pick-btn").addEventListener("click", () => {
+    const allCards = Array.from(listEl.querySelectorAll(".question"));
+    allCards.forEach(c => c.classList.remove("highlighted"));
+    const activeCards = allCards.filter(c => !c.querySelector("input[type='checkbox']").checked);
+
+    const resBox = document.getElementById("pick-result");
+    const resTitle = document.getElementById("pick-title");
+    const resNote = document.getElementById("pick-note");
+
+    if (activeCards.length === 0) {
+        resBox.classList.add("active");
+        resTitle.textContent = "All caught up! 🎉";
+        resNote.textContent = "No uncompleted items left in this section.";
+        return;
+    }
+
+    const chosen = activeCards[Math.floor(Math.random() * activeCards.length)];
+    const title = chosen.querySelector(".item-title").textContent;
+    const tagEl = chosen.querySelector(".tag");
+    const note = chosen.querySelector("p") ? chosen.querySelector("p").textContent : "";
+
+    resBox.classList.add("active");
+    resTitle.textContent = title + (tagEl ? " [" + tagEl.textContent + "]" : "");
+    resNote.textContent = note;
+
+    chosen.classList.add("highlighted");
+    chosen.scrollIntoView({ behavior: "smooth", block: "center" });
+});
+
+document.getElementById("toggle-done-btn").addEventListener("click", (e) => {
+    hideDone = !hideDone;
+    e.target.classList.toggle("active", hideDone);
+    e.target.textContent = hideDone ? "Show Done" : "Hide Done";
+    updateStats();
+});
+
+document.getElementById("print-btn").addEventListener("click", () => {
+    window.print();
+});
+
+loadState();
+</script>
+</body>
+</html>
